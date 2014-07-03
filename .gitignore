@@ -85,3 +85,5 @@ test-secondary
 test-sharded-cluster
 test-x509
 *.pyc
+*.err
+*.log
