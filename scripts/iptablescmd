@@ -1,0 +1,26 @@
+#! /bin/bash
+# clear old 
+iptables -F
+iptables -X
+iptables -Z
+iptables -P INPUT DROP
+
+# accept all of lo
+iptables -A INPUT -i lo -j ACCEPT
+
+# all out of this host is accept
+iptables -A INPUT -m state --state RELATED,ESTABLISHED -j ACCEPT
+
+# all ping request refuse, except from me
+iptables -A INPUT -p icmp --icmp-type 8 -j DROP
+iptables -A INPUT -p icmp --icmp-type 0 -j ACCEPT
+
+# application rules
+iptables -A INPUT -i eth0 -p tcp -m tcp --dport 2222 -j ACCEPT
+iptables -A INPUT -i eth0 -p tcp -m tcp --dport 80 -j ACCEPT
+iptables -A INPUT -i eth0 -p tcp -m tcp --dport 443 -j ACCEPT
+
+# dns
+iptables -A INPUT -s 0/0 -p udp --dport 53 -j ACCEPT
+
+# Completed on Sun Jul  6 16:36:16 2014
