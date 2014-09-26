@@ -1,0 +1,5 @@
+部署：
+1、依次安装以下两个安装包
+	codemeter64_5.10.1239.502_amd64.deb
+	axprotector64_8.40.1062_amd64.deb
+2、编译安装linuv

@@ -1,0 +1,2 @@
+add_subdirectory(libWibuData)
+add_subdirectory(authServer)
