@@ -18,9 +18,9 @@ uv_loop_t* _loop;
 static void tinyweb_on_connection(uv_stream_t* server, int status);
 
 static bool bHasExpired = false;
+static char szMd5[33];
 
 static void thread_entry(void* arg) {
-	
 	while (true)
 	{
 		if (bHasExpired = true)
@@ -38,7 +38,9 @@ static void thread_entry(void* arg) {
 
 //start web server, linstening ip:port
 //ip can be NULL or "", which means "0.0.0.0"
-void tinyweb_start(uv_loop_t* loop, const char* ip, int port) {
+void tinyweb_start(uv_loop_t* loop, const char* ip, int port, const char* md5) {
+
+	strcpy(szMd5, md5);
 
 	struct sockaddr_in addr;
 	uv_ip4_addr((ip && ip[0]) ? ip : "0.0.0.0", port, &addr);
@@ -131,93 +133,57 @@ static void tinyweb_on_connection(uv_stream_t* server, int status) {
 		strDate = strContext.substr(0, nPos);
                 strMd5 = strContext.substr(nPos + 1);
 
-		// Get MAC
-		char szMac[19];
-                FILE * fp;
-                char strCmd[128]="ifconfig | grep eth0 | awk '{print $5}'";
-
-                if ((fp = popen(strCmd, "r")) == NULL)
-                {
-			snprintf(content, sizeof(content), "\"Get Mac Failed\"}\r\n");
-                }
+		// Compare Mac'Md5 to strMd5
+		if (strcmp(szMd5, strMd5.c_str()) != 0)
+		{
+			snprintf(content, sizeof(content), "\"PC had not been authorized.\"}\r\n");
+		}
 		else
 		{
-			if (fgets(szMac, sizeof(szMac)-1, fp) == NULL)
+			if (strDate == "Error")
 			{
-				snprintf(content, sizeof(content), "\"Get Mac Failed\"}\r\n");
+				snprintf(content, sizeof(content), "\"%s\"}\r\n", strDate.c_str());
 			}
 			else
 			{
-				// Change Mac to Md5
-				MD5_CTX ctx;
-				unsigned char md[16];				
-				char buf[33]={'\0'};
-			        char tmp[33]={'\0'};
-
-				int i;				
-
-				MD5_Init(&ctx);
-				MD5_Update(&ctx, szMac, strlen(szMac));
-				MD5_Final(md, &ctx);
-				for (i=0; i<16; i++)
-        			{
-			                sprintf(tmp, "%02x", md[i]);
-			                strcat(buf, tmp);
-			        }
-
-				// Compare Mac'Md5 to strMd5
-				if (strcmp(buf, strMd5.c_str()) != 0)
+				if (strDate.length() == 0)
 				{
-					snprintf(content, sizeof(content), "\"PC had not been authorized.\"}\r\n");
+					snprintf(content, sizeof(content), "\"NeverExpired\"}\r\n");
 				}
 				else
 				{
-					if (strDate == "Error")
+					struct tm date;
+
+					sscanf(strDate.c_str(), "%d-%d-%d %d:%d:%d"
+								, &date.tm_year, &date.tm_mon, &date.tm_mday
+								, &date.tm_hour, &date.tm_min, &date.tm_sec);
+					date.tm_year -= 1900;
+					date.tm_mon -= 1;
+
+					time_t expTime = mktime(&date);
+					time_t now = time(NULL);
+
+					date.tm_year += 1900;
+					date.tm_mon += 1;
+					if (expTime < 0)
 					{
-						snprintf(content, sizeof(content), "\"%s\"}\r\n", strDate.c_str());
+						snprintf(content, sizeof(content), "\"%d-%d-%d\"}\r\n"
+										 , date.tm_year, date.tm_mon, date.tm_mday);
+					}
+					else if (difftime(now, expTime) <0)
+					{
+						snprintf(content, sizeof(content), "\"%d-%d-%d\"}\r\n"
+										 , date.tm_year, date.tm_mon, date.tm_mday);
 					}
 					else
 					{
-						if (strDate.length() == 0)
-						{
-							snprintf(content, sizeof(content), "\"NeverExpired\"}\r\n");
-						}
-						else
-						{
-							struct tm date;
-
-							sscanf(strDate.c_str(), "%d-%d-%d %d:%d:%d"
-										, &date.tm_year, &date.tm_mon, &date.tm_mday
-										, &date.tm_hour, &date.tm_min, &date.tm_sec);
-							date.tm_year -= 1900;
-							date.tm_mon -= 1;
-
-							time_t expTime = mktime(&date);
-							time_t now = time(NULL);
-
-							date.tm_year += 1900;
-							date.tm_mon += 1;
-							if (expTime < 0)
-							{
-								snprintf(content, sizeof(content), "\"%d-%d-%d\"}\r\n"
-												 , date.tm_year, date.tm_mon, date.tm_mday);
-							}
-							else if (difftime(now, expTime) <0)
-							{
-								snprintf(content, sizeof(content), "\"%d-%d-%d\"}\r\n"
-												 , date.tm_year, date.tm_mon, date.tm_mday);
-							}
-							else
-							{
-								snprintf(content, sizeof(content), "\"%d-%d-%d\"}\r\n"
-												 , date.tm_year, date.tm_mon, date.tm_mday);
-								bHasExpired = true;
-							}
-						}
-					}// End if(strDate == "Error")
-				}// End if (strcmp(buf, strMd5.c_str()) != 0)
-			}// End if (fgets(szMac, sizeof(szMac)-1, fp) == NULL)
-		}// End if ((fp = popen(strCmd, "r")) == NULL)
+						snprintf(content, sizeof(content), "\"%d-%d-%d\"}\r\n"
+										 , date.tm_year, date.tm_mon, date.tm_mday);
+						bHasExpired = true;
+					}
+				}
+			}// End if(strDate == "Error")
+		}// End if (strcmp(buf, strMd5.c_str()) != 0)
 	}// End if (nPos == std::string::npos)
 
 	char* http_respone = format_http_respone("200 OK", "text/html", content, -1);
