@@ -9,6 +9,7 @@ import os
 import cStringIO
 import pymongo
 import base64
+import json
 import logging
 from qiniu import rs
 from qiniu import conf
@@ -21,8 +22,8 @@ conf.SECRET_KEY = os.getenv("QINIU_SECRET_KEY")
 bucket_name = os.getenv("QINIU_BUCKET")
 
 restservicename = "castle"
-mkeyprifix = "rest/services/3DTileService/datasources"
-tkeyprifix = mkeyprifix + "/" + restservicename + "/tiles/"
+mkeyprefxi = "rest/services/3DTileService/datasources"
+tkeyprefxi = mkeyprefxi + "/" + restservicename + "/tiles/"
 mongohost = "127.0.0.1"
 mongoport = 27017
 mongodb = "castle0701JPG"
@@ -34,7 +35,7 @@ extra.mime_type = "application/octet-stream"
 
 
 # log infomation
-logger = logging.getLogger('anzhj@gvitech') 
+logger = logging.getLogger('anzhj') 
 logger.setLevel(logging.DEBUG) 
    
 fh = logging.FileHandler('run.log') 
@@ -68,7 +69,7 @@ class Up2qn:
 		'''Unitializes upload tools'''
 		logger.debug( 'Unitializes.\n' )
 
-	def writeQnTile(self, key, mf):
+	def writeQnData(self, key, mf):
 		while True:
 			ret, err = io.put(uptoken, key, mf, extra)
 			if err is not None:
@@ -77,16 +78,28 @@ class Up2qn:
 				logger.info(ret)
 				break
 
-	def writeQnM(self, strdata):
+	def writeQnMeta(self, strdata):
 		tmp = base64.encodestring(strdata)
-		mf = cStringIO.StringIO(tmp)
-		sKey = '%s%s' % (mkeyprifix, restservicename)
-		self.writeQnTile(sKey, mf)
+		sKey = '%s/%s' % (mkeyprefxi, restservicename)
+		mRefList = [tkeyprefxi + "m"]
 
-	def writeQnN(self, key, strdata):
+		mDict = {'childURIs':mRefList, 
+				'datasourceInfo':{
+					'name':restservicename
+					,'data':tmp
+					,'dbType':'GMAP'
+					,'isEncoded':False}
+				}
+
+		jsonstr = json.dumps(mDict)
+
+		mf = cStringIO.StringIO(jsonstr)
+		self.writeQnData(sKey, mf)
+
+	def writeQnTile(self, key, strdata):
 		mf = cStringIO.StringIO(strdata)
-		sKey = '%s%s' % (tkeyprifix, key)
-		self.writeQnTile(sKey, mf)
+		sKey = '%s%s' % (tkeyprefxi, key)
+		self.writeQnData(sKey, mf)
 	
 	def run(self):
 		client = pymongo.MongoClient(mongohost, mongoport)
@@ -98,9 +111,10 @@ class Up2qn:
 			data = doc["mp"]
 
 			if key != "m":
-				self.writeQnN(key, data)
+				self.writeQnTile(key, data)
 			else:
-				self.writeQnM(data)
+				self.writeQnMeta(data)
+				self.writeQnTile(key, data)
 
 
 runner = Up2qn()

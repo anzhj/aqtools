@@ -5,6 +5,7 @@
 __author__ = 'anzhj'
 
 import sys
+import os
 import cStringIO
 import pymongo
 import base64
@@ -19,8 +20,9 @@ conf.ACCESS_KEY = os.getenv("QINIU_ACCESS_KEY")
 conf.SECRET_KEY = os.getenv("QINIU_SECRET_KEY")
 bucket_name = os.getenv("QINIU_BUCKET")
 restservicename = "castle"
-mkeyprifix = "rest/services/3DTileService/datasources"
-tkeyprifix = mkeyprifix + "/" + restservicename + "/tiles/"
+mkeyprefix = "rest/services/3DTileService/datasources"
+tkeyprefix = mkeyprifix + "/" + restservicename + "/tiles/"
+dbprefix = mkeyprefix + "/" + restservicename
 
 policy = rs.PutPolicy(bucket_name)
 uptoken = policy.token()
@@ -50,7 +52,7 @@ class RemoveQn:
 		err = None
 		rs = rsf.Client()
 		while err is None:
-			ret, err = rs.list_prefix(bucket_name, prefix="rest", limit=10, marker=marker)
+			ret, err = rs.list_prefix(bucket_name, prefix=dbprefix, limit=10, marker=marker)
 			marker = ret.get('marker', None)
 			for item in ret['items']:
 				print item
